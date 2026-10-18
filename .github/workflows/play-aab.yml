@@ -52,3 +52,15 @@ jobs:
         with:
           name: FORK-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
+      - name: Make installable APK
+        env:
+          FORK_KEYSTORE_PASSWORD: ${{ secrets.FORK_KEYSTORE_PASSWORD }}
+          FORK_KEY_ALIAS: ${{ secrets.FORK_KEY_ALIAS }}
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/bt.jar" https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          java -jar "$RUNNER_TEMP/bt.jar" build-apks --bundle=android/app/build/outputs/bundle/release/app-release.aab --output="$RUNNER_TEMP/fork.apks" --mode=universal --ks="$FORK_KEYSTORE" --ks-pass=pass:"$FORK_KEYSTORE_PASSWORD" --ks-key-alias="$FORK_KEY_ALIAS" --key-pass=pass:"$FORK_KEYSTORE_PASSWORD"
+          unzip -p "$RUNNER_TEMP/fork.apks" universal.apk > FORK.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FORK-apk
+          path: FORK.apk
