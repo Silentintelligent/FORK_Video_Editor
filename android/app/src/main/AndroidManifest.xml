@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Only to download the optional AI models (captions, voices, cutout)
+         from Settings. Nothing about the user's footage is uploaded. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- No Java/Kotlin of its own: the window is a NativeActivity running
+         libconcat_android.so (the Rust crate concat-android). -->
+    <application
+        android:label="FORK"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="false"
+        android:allowBackup="false"
+        android:extractNativeLibs="false">
+
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|keyboardHidden|keyboard|navigation|screenSize|smallestScreenSize|screenLayout|uiMode|density|fontScale|fontWeightAdjustment|locale|layoutDirection">
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="concat_android" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
