@@ -31,7 +31,7 @@ jni="$root/android/app/src/main/jniLibs"
 rm -rf "$jni"
 cargo ndk -t arm64-v8a --platform 26 -o "$jni" build --release -p concat-android
 # runtime libraries the app loads beside it (ONNX Runtime, sherpa-onnx, libc++_shared)
-cp -n "$root"/src/vendor/sherpa-onnx/jniLibs/arm64-v8a/*.so "$jni/arm64-v8a/"
+cp -f "$root"/src/vendor/sherpa-onnx/jniLibs/arm64-v8a/*.so "$jni/arm64-v8a/"
 
 # 3. 16 KB page-size check: every LOAD segment must be aligned to 0x4000 or more.
 fail=0
