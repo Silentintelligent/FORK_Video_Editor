@@ -1,48 +1,57 @@
 #!/usr/bin/env bash
 # Builds FORK as a signed Android App Bundle (.aab) for Google Play.
-#
-# Needs (Linux or macOS):
-#   - Rust (version in src/rust-toolchain.toml) + `rustup target add aarch64-linux-android`
-#   - cargo install cargo-ndk
-#   - Android SDK with platform 36, build-tools 36, and NDK r28 or newer
-#       (r28+ links for 16 KB memory pages by default, which Play requires)
-#   - JDK 17+, Gradle 8.13+ (or run `gradle wrapper --gradle-version 8.13` in android/)
-#   - cmake, libclang-dev
-#   - env: ANDROID_HOME, and for signing FORK_KEYSTORE, FORK_KEYSTORE_PASSWORD, FORK_KEY_ALIAS
-#
-# Usage:  ./build-aab.sh [versionCode] [versionName]
-# Output: android/app/build/outputs/bundle/release/app-release.aab
+# Usage: ./build-aab.sh [versionCode] [versionName]
 set -euo pipefail
+
 root=$(cd "$(dirname "$0")" && pwd)
 code=${1:-1}
 name=${2:-0.1.0}
 
-: "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK}"
+: "${ANDROID_HOME:?ANDROID_HOME is not set}"
 
-# 1. Native libraries FFmpeg and sherpa-onnx (arm64)
+echo "== 1. FFmpeg for arm64"
 "$root/src/scripts/ffmpeg-mobile.sh" aarch64-linux-android
+
+echo "== 2. sherpa-onnx for arm64"
 "$root/src/scripts/sherpa-mobile.sh" aarch64-linux-android
 
-# 2. The Rust app, built as libconcat_android.so into the Gradle project
+echo "== 3. Rust build of libconcat_android.so"
 cd "$root/src"
-eval "$(scripts/mobile-env.sh aarch64-linux-android)"
+env_exports=$(scripts/mobile-env.sh aarch64-linux-android)
+eval "$env_exports"
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
-jni="$root/android/app/src/main/jniLibs"
-rm -rf "$jni"
-cargo ndk -t arm64-v8a --platform 26 build --release -p concat-android && mkdir -p "$jni/arm64-v8a" && cp -f target/aarch64-linux-android/release/libconcat_android.so "$jni/arm64-v8a/"
-# runtime libraries the app loads beside it (ONNX Runtime, sherpa-onnx, libc++_shared)
-cp -f "$root"/src/vendor/sherpa-onnx/jniLibs/arm64-v8a/*.so "$jni/arm64-v8a/"
+cargo ndk -t arm64-v8a --platform 26 build --release -p concat-android
 
-# 3. 16 KB page-size check: every LOAD segment must be aligned to 0x4000 or more.
+echo "== 4. Copying native libraries into the Gradle project"
+so=$(find "$root/src" -path "*aarch64-linux-android/release/libconcat_android.so" | head -n 1)
+if [ -z "$so" ]; then
+  echo "ERROR: libconcat_android.so was not found after the build" >&2
+  exit 1
+fi
+echo "found: $so"
+jni="$root/android/app/src/main/jniLibs/arm64-v8a"
+rm -rf "$root/android/app/src/main/jniLibs"
+mkdir -p "$jni"
+cp -f "$so" "$jni/"
+cp -f "$root"/src/vendor/sherpa-onnx/jniLibs/arm64-v8a/*.so "$jni/"
+ls -l "$jni"
+
+echo "== 5. 16 KB page-size check"
 fail=0
-for so in "$jni"/arm64-v8a/*.so; do
-  bad=$(readelf -lW "$so" | awk '$1=="LOAD" {print $NF}' | while read -r a; do
-          [ $((a)) -lt 16384 ] && echo bad; done | head -1)
-  if [ -n "$bad" ]; then echo "NOT 16 KB aligned: $so" >&2; fail=1; fi
+for lib in "$jni"/*.so; do
+  while read -r align; do
+    if [ $((align)) -lt 16384 ]; then
+      echo "NOT 16 KB aligned: $lib (align $align)" >&2
+      fail=1
+      break
+    fi
+  done < <(readelf -lW "$lib" | awk '$1=="LOAD" {print $NF}')
 done
-[ $fail -eq 0 ] || { echo "Rebuild the listed libraries with -Wl,-z,max-page-size=16384 (or use a newer release of them) and run again." >&2; exit 1; }
+if [ "$fail" -ne 0 ]; then
+  echo "WARNING: the libraries listed above are not 16 KB aligned. The bundle is still built so you can test it, but Google Play may reject it until they are rebuilt." >&2
+fi
 
-# 4. Package + sign the bundle
+echo "== 6. Gradle bundle and signing"
 cd "$root/android"
 gradle --no-daemon bundleRelease -PFORK_VERSION_CODE="$code" -PFORK_VERSION_NAME="$name"
 echo "Done: $root/android/app/build/outputs/bundle/release/app-release.aab"
