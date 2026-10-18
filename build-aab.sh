@@ -29,7 +29,7 @@ eval "$(scripts/mobile-env.sh aarch64-linux-android)"
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
 jni="$root/android/app/src/main/jniLibs"
 rm -rf "$jni"
-cargo ndk -t arm64-v8a --platform 26 -o "$jni" build --release -p concat-android
+cargo ndk -t arm64-v8a --platform 26 build --release -p concat-android && mkdir -p "$jni/arm64-v8a" && cp -f target/aarch64-linux-android/release/libconcat_android.so "$jni/arm64-v8a/"
 # runtime libraries the app loads beside it (ONNX Runtime, sherpa-onnx, libc++_shared)
 cp -f "$root"/src/vendor/sherpa-onnx/jniLibs/arm64-v8a/*.so "$jni/arm64-v8a/"
 
