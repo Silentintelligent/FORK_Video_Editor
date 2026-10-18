@@ -41,7 +41,7 @@ jobs:
         with: { gradle-version: "8.13" }
       - name: Upload keystore
         run: |
-          echo "${{ secrets.FORK_KEYSTORE }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "${{ secrets.FORK_KEYSTORE }}" | tr -cd 'A-Za-z0-9+/=' | base64 -d > "$RUNNER_TEMP/upload.jks"
           echo "FORK_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
       - name: Build
         env:
