@@ -9,7 +9,7 @@
          libconcat_android.so (the Rust crate concat-android). -->
     <application
         android:label="FORK"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/fork_icon"
         android:hasCode="false"
         android:allowBackup="false"
         android:extractNativeLibs="false">
